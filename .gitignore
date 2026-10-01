@@ -1,0 +1,20 @@
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Secrets and environment variables
+.env
+.env.*
+
+# Logs
+logs/*.log
+
+# macOS
+.DS_Store
+
+# AWS credentials
+.aws/
+credentials
