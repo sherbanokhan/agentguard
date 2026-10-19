@@ -8,7 +8,7 @@ This log documents the design decisions, security concepts, problems, testing, a
 
 ### Date
 
-September 30, 2026
+Oct 19, 2026
 
 ### Objective
 
@@ -58,19 +58,21 @@ Python virtual environments isolate project dependencies from the system Python 
 
 ### Problems Encountered
 
-Initially, `git status` returned:
+#### Problem 1: GitHub SSH Authentication and Key Security
 
-`fatal: not a git repository`
+Pushing over HTTPS failed because GitHub no longer accepts account passwords
+for Git operations. I switched to SSH authentication using an Ed25519 key pair.
 
-This happened because the command was being executed from my home directory instead of inside the AgentGuard project.
+While generating the key, the key files were accidentally created inside the
+project folder instead of `~/.ssh/`. I noticed them in `git status` as untracked
+files before committing.
 
-### Resolution
+**Fix:** Moved both key files to `~/.ssh/`, confirmed they no longer appeared in
+`git status`, and verified authentication with `ssh -T git@github.com`.
 
-Created the AgentGuard directory, moved into it, and initialized Git using `git init`.
-
-### Key Lesson
-
-Git commands operate relative to the repository I am currently working inside. I should use `pwd` when I am unsure which directory Terminal is currently using.
+**Lesson:** Always review `git status` before committing. A private key pushed
+to a public repository should be treated as compromised and rotated immediately.
+I added SSH key patterns to `.gitignore` as a second layer of protection.
 
 ### Next Step
 
