@@ -198,3 +198,49 @@ I mapped the two vulnerabilities to official categories:
 - Prompt injection: OWASP LLM01 and CWE-1427
 - Path traversal: CWE-22 (also called directory traversal)
 
+---
+
+## Automated Security Tests
+
+### Date
+
+October 25, 2026
+
+### Objective
+
+Turn my manual attack checks into automated tests, so I can prove the vulnerabilities exist now and later prove my defenses block them.
+
+### What I Built
+
+I installed `pytest` and created `tests/test_vulnerable_agent.py` with three tests:
+
+- `test_prompt_injection_exfiltrates_secret` checks that the agent follows the hidden instructions and sends the fake API key to the attacker.
+- `test_path_traversal_escapes_lab_folder` checks that the agent reads the fake SSH key from outside `lab_data/`.
+- `test_benign_article_triggers_no_actions` checks that a normal article does not make the agent read or send anything.
+
+The first two tests pass when the attacks succeed. This proves the vulnerabilities are real before I try to fix them. The third test is a baseline that makes sure normal behavior still works. When I add defenses, it will help me catch false positives.
+
+### How the Tests Stay Safe
+
+Each test builds a fresh, temporary lab using pytest's `tmp_path`. I used `monkeypatch` to point the agent at the temporary folders during the test. This way, tests never touch my real `app/lab_data/` folder, and every test starts clean.
+
+### Other Setup
+
+- Added an empty `app/__init__.py` so Python can import the agent as a package.
+- Added `pytest.ini` so pytest knows where to find my code and tests.
+- Saved exact package versions to `requirements.txt` with `pip freeze`, so others can install the same versions.
+- Added `.pytest_cache/` to `.gitignore`.
+
+### Testing
+
+I ran `pytest -v`. All 3 tests passed in 0.01 seconds.
+
+I also ran `git status --untracked-files=all` and confirmed no fake key files or cache folders were showing up.
+
+### What I Learned
+
+Running the script and reading the output works, but it depends on me checking it every time. Automated tests check the results in code, so I can rerun them anytime and know right away if something changed.
+
+### Next Step
+
+Build a secure version of the agent. Then write tests that show the same attacks are blocked while normal articles still work.

@@ -30,3 +30,6 @@ fake_api_key.txt
 # AgentGuard lab folders (generated at runtime)
 app/lab_data/
 app/lab_private/
+
+# Pytest cache
+.pytest_cache/
