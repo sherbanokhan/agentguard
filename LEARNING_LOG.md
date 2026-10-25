@@ -20,6 +20,8 @@ Set up the AgentGuard development environment and begin building a controlled vu
 - Initialized a Git repository.
 - Created a Python virtual environment.
 - Created the initial project structure.
+- Connected the project to GitHub using SSH authentication.
+- Pushed the project to a public GitHub repository.
 - Added a `.gitignore` file.
 - Prevented the virtual environment, secrets, logs, and credentials from being committed to Git.
 - Created initial project documentation.
@@ -41,6 +43,26 @@ Set up the AgentGuard development environment and begin building a controlled vu
 `python3 -m venv .venv` — create an isolated Python environment.
 
 `source .venv/bin/activate` — activate the project's Python environment.
+
+`git add` — stage files to be included in the next commit.
+
+`git commit -m "message"` — save a snapshot of staged changes.
+
+`git push` — upload commits to GitHub.
+
+`git log --oneline` — show the commit history.
+
+`git diff` — show what changed in a file since the last commit.
+
+`git remote -v` — show where the repository is connected.
+
+`ssh -T git@github.com` — test SSH authentication with GitHub.
+
+`ls -la` — list all files, including hidden ones.
+
+`cat` — print the contents of a file.
+
+I also learned that Git does not track empty folders, so folders like `attacks/` and `tests/` will not appear on GitHub until they contain a file.
 
 ### Security Concepts Learned
 
@@ -90,6 +112,10 @@ October 19, 2026
 
 Build an intentionally vulnerable AI agent and reproduce an indirect prompt injection attack in a safe, controlled simulation before building any defenses.
 
+### Why a Simulation
+
+I started with a deterministic simulation instead of a real LLM or external API. A real LLM can give different answers to the same input, which makes it hard to tell whether a security fix actually worked. With a simulation, the same input always gives the same output, so I can reproduce the attack safely, understand the cause, and measure whether my defenses work.
+
 ### What I Built
 
 I created `app/vulnerable_agent.py`, which simulates an AI agent that has access to two tools: `read_file()` and `send_message()`.
@@ -108,15 +134,15 @@ This is an example of:
 ### How I Kept the Lab Safe
 
 - The secret is fake (`DEMO_KEY_NOT_REAL_12345`).
-- The agent only reads files inside `app/lab_data/`.
+- The agent is supposed to only read files inside `app/lab_data/`. (I later found this restriction could be bypassed with path traversal. See the next entry.)
 - `send_message()` only prints to the terminal. Nothing is sent over the network.
 - I added `fake_api_key.txt` to `.gitignore` so even the fake secret does not get committed.
 
 ### Testing
 
-I ran: `python3 app/vulnerable_agent.py` the output showed the fake secret being sent to `attacker@example.test`, which confirmed the attack worked.
+I ran `python3 app/vulnerable_agent.py`. The output showed the fake secret being sent to `attacker@example.test`, which confirmed the attack worked.
 
-I also ran: `git status --untracked-files=all` ,  `fake_api_key.txt` did not show up, which confirmed that `.gitignore` was working.
+I also ran `git status --untracked-files=all`. `fake_api_key.txt` did not show up, which confirmed that `.gitignore` was working.
 
 ### What I Learned
 
@@ -166,3 +192,9 @@ Both attacks worked:
 The agent has two separate problems. Prompt injection lets the attacker decide what the agent does, and path traversal lets the attacker decide which files it can reach. Fixing only one of them isn't enough, so the secure version will need protections at both layers.
 
 I also learned that in Python, joining a folder with an absolute path like `/Users/...` replaces the folder completely. Because of this, I made it a rule to never put real file paths in my test articles.
+
+I mapped the two vulnerabilities to official categories:
+
+- Prompt injection: OWASP LLM01 and CWE-1427
+- Path traversal: CWE-22 (also called directory traversal)
+
