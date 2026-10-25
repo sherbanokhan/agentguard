@@ -125,3 +125,44 @@ The main problem with AI agents is that untrusted data and trusted instructions 
 ### Limitations
 
 This is a deterministic simulation, not a real LLM. The `if` statement stands in for the model's decision. Also, the attacker's email address is hardcoded in the agent. In the next version, the agent will pull the file name and destination directly from the article, which is closer to how a real attack works.
+
+---
+
+## Making the Attack Realistic and Finding Path Traversal
+
+### Date
+
+October 25, 2026
+
+### Objective
+
+Update the vulnerable agent so the attacker controls the whole attack, and test whether the agent's file tool can be used to reach files outside its allowed folder.
+
+### What I Changed
+
+In the first version, the attacker's email address was hardcoded in the agent, which isn't realistic. I updated the agent so it uses regular expressions to pull both the file name and the destination directly from the article. Now everything the agent does is controlled by the malicious content.
+
+I also moved the lab setup into a `setup_lab()` function and made the agent return what it did. This will make it easier to write automated tests.
+
+### Path Traversal Test
+
+I added a second attack article that asks the agent to read `../lab_private/fake_ssh_key.txt`. The `../` tells the system to go up one folder, which escapes `lab_data/`.
+
+To keep this safe, I created a decoy folder called `lab_private/` with a fake SSH key. That way I could prove the escape without the agent ever touching a real file on my Mac. I also added both lab folders to `.gitignore`.
+
+### Testing
+
+I ran:
+
+`python3 app/vulnerable_agent.py`
+
+Both attacks worked:
+
+- Attack 1 sent `DEMO_KEY_NOT_REAL_12345` to `attacker@example.test`.
+- Attack 2 escaped `lab_data/` and sent `DEMO_SSH_KEY_NOT_REAL_67890` to the attacker.
+
+### What I Learned
+
+The agent has two separate problems. Prompt injection lets the attacker decide what the agent does, and path traversal lets the attacker decide which files it can reach. Fixing only one of them isn't enough, so the secure version will need protections at both layers.
+
+I also learned that in Python, joining a folder with an absolute path like `/Users/...` replaces the folder completely. Because of this, I made it a rule to never put real file paths in my test articles.
