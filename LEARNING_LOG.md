@@ -244,3 +244,65 @@ Running the script and reading the output works, but it depends on me checking i
 ### Next Step
 
 Build a secure version of the agent. Then write tests that show the same attacks are blocked while normal articles still work.
+
+---
+
+## Building the Secure Agent
+
+### Date
+
+October 28, 2026
+
+### Objective
+
+Build a secure version of the agent that blocks both attacks, and prove it with automated tests.
+
+### What I Built
+
+I created `app/secure_agent.py` with three layers of defense:
+
+- **Layer 1: Content is treated as data only.** The agent's only job is to summarize the article. Nothing in the article can trigger a tool, no matter how the instruction is worded. This is the main fix for prompt injection.
+- **Layer 2: The tools protect themselves.** `safe_read_file()` blocks absolute paths and checks where a path actually ends up after resolving `../`. If it lands outside `lab_data/`, it's blocked. `safe_send_message()` only sends to addresses on an allowlist.
+- **Layer 3: Detection and logging.** The agent looks for phrases that look like instructions and logs a warning. Every blocked tool call is also logged to `logs/security_events.log`.
+
+Layer 1 already stops both attacks, but I added layer 2 anyway. If someone later adds a feature that lets content reach a tool, the tools are still safe on their own. This is defense in depth.
+
+### Design Decisions
+
+- **Checking the resolved path instead of searching for `../`.** There are many ways to disguise `../` in text, but the final location of a path can't be disguised.
+- **Allowlist instead of blocklist.** I can't list every bad email address, but I can list the few approved ones.
+- **Detection only logs, it doesn't block.** Pattern matching is easy to get around by rewording, and it can flag normal text like "read the FAQ." So it's a warning system, not the real defense.
+- **Reused the same attack articles** from the vulnerable agent so the before-and-after comparison is fair.
+
+### Testing
+
+I wrote `tests/test_secure_agent.py` with 10 tests that check:
+
+- Both attack articles cause no reads or sends.
+- Injection attempts are detected.
+- A normal article is summarized without a warning.
+- `safe_read_file()` blocks path traversal and absolute paths, but still reads files inside the lab.
+- `safe_send_message()` blocks unapproved addresses but allows approved ones.
+- Blocked actions show up in the log.
+
+I ran `pytest -v --no-header`. All 13 tests passed: 3 showing the attacks work against the vulnerable agent, and 10 showing they're blocked by the secure agent.
+
+### Problems Encountered
+
+When I first ran pytest, it only found 3 tests. The new test file hadn't been saved in VS Code, so pytest saw an empty file and didn't show any error. Saving the file fixed it. Lesson: if the number of collected tests looks wrong, check that the file actually has content.
+
+I also noticed the security log kept lines from earlier runs. The log adds to the end of the file instead of replacing it, which is how an audit trail should work.
+
+### What I Learned
+
+Fixing prompt injection isn't about catching bad phrases. It's about making sure untrusted content can never control tools in the first place. Tests that check normal behavior still works are just as important as tests that check attacks are blocked, because a defense that blocks everything is useless.
+
+### Limitations
+
+- The summary is a stand-in for an LLM. A real LLM reads instructions and data in the same text, so separating them is much harder than in my simulation.
+- The detection patterns are simple and easy to reword around.
+- The allowlist is hardcoded in the code. In a real system, it would come from a config file or a policy service.
+
+### Screenshots
+
+Saved to `docs/images/` .
