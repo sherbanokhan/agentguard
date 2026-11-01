@@ -100,4 +100,4 @@ agentguard/
 
 ## Learning Log
 
-I documented every step, including problems I ran into and how I fixed them, in (LEARNING_LOG.md).
+I documented every step, including problems I ran into and how I fixed them, in [LEARNING_LOG.md](LEARNING_LOG.md).
