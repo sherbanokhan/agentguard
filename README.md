@@ -79,7 +79,7 @@ agentguard/
 │   ├── test_vulnerable_agent.py
 │   └── test_secure_agent.py
 ├── docs/images/               # screenshots
-├── logs/                      # security log (not committed)
+├── logs/                      # created when the secure agent runs (not committed)
 └── LEARNING_LOG.md            # decisions, problems, and lessons
 ```
 
