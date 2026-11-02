@@ -306,3 +306,76 @@ Fixing prompt injection isn't about catching bad phrases. It's about making sure
 ### Screenshots
 
 Saved to `docs/images/` .
+
+---
+
+## Security Scanning and Fixing a Real Vulnerability
+
+### Date
+
+October 31, 2026
+
+### Objective
+
+Add automated security checks to the project and fix any problems they find.
+
+### What I Added
+
+I set up a GitHub Actions workflow (`.github/workflows/security-ci.yml`) that runs on every push and pull request. It runs three checks:
+
+- **pytest:** runs all 13 tests.
+- **bandit:** scans my Python code for risky patterns.
+- **pip-audit:** checks my packages against a database of known vulnerabilities.
+
+I gave the workflow `contents: read` permission only. It doesn't need to change anything in the repo, so it shouldn't be able to. This is the same least privilege idea as the allowlist in my secure agent.
+
+### What the Scans Found
+
+**bandit:** No issues in 142 lines of code.
+
+This was interesting, because bandit didn't flag the vulnerable agent. Bandit looks for known risky Python patterns, like running shell commands or hardcoded passwords. It doesn't understand that my `read_file()` trusts a file name from an article. Automated scanners catch common mistakes, but logic flaws in my own design still need manual testing.
+
+**pip-audit:** Found one known vulnerability.
+
+| Package | Version | ID | Fixed in |
+|---|---|---|---|
+| pytest | 8.4.2 | PYSEC-2026-1845 | 9.0.3 |
+
+pytest creates temporary folders with a predictable name in `/tmp`, like `/tmp/pytest-of-{user}`. Since `/tmp` is shared by all users on a computer, another local user could create that folder first and cause a denial of service or possibly gain privileges. My tests use `tmp_path`, so they use this feature.
+
+### Risk Assessment
+
+I rated it low risk for this project:
+
+- It can only be exploited by someone with an account on the same computer.
+- My Mac only has one user, and GitHub Actions uses a fresh, single-user machine for every run.
+- pytest is a development tool, not part of the agent itself.
+
+Low risk doesn't mean ignore it, so I still fixed it.
+
+### Problem: The Fix Required Upgrading Python
+
+When I tried to upgrade pytest, it stayed on 8.4.2. Newer versions of pytest don't support Python 3.9, which was the version my project used. Python 3.9 reached end of life in October 2025, so it also no longer gets security fixes. The real root cause wasn't pytest, it was the outdated Python version.
+
+I also noticed a `NotOpenSSLWarning` when running pip-audit, because the Mac's built-in Python 3.9 uses an old encryption library. This was another sign the old setup needed to be replaced.
+
+### The Fix
+
+- Installed Python 3.14.10 from python.org and ran `Install Certificates.command` so it could make secure connections.
+- I chose 3.14 instead of 3.15. Python 3.15 was only released a few weeks ago, and tools often need time to support a brand-new version. I avoided 3.13 because it had moved to security-fix-only status with no macOS installer.
+- Deleted and rebuilt the `.venv` with Python 3.14.
+- Installed pytest 9.2.0 and updated `requirements.txt` with `pip freeze`.
+- Installed bandit and pip-audit after `pip freeze` so they stay out of `requirements.txt`, since the agent doesn't need them to run.
+- Updated the CI workflow to test on Python 3.12 and 3.14.
+
+### Testing
+
+- `pip-audit -r requirements.txt`: No known vulnerabilities found.
+- `bandit -r app`: No issues identified.
+- `pytest -v`: All 13 tests passed on Python 3.14.
+
+### What I Learned
+
+I followed the full process: detect, understand, assess, fix. Reading the advisory first helped me understand the real risk instead of just upgrading blindly.
+
+I also learned that the latest version isn't always the safest choice. The safest choice is usually a supported, stable version that my tools work with. Unsupported software quietly collects unfixed vulnerabilities, which is what happened with Python 3.9.

@@ -50,7 +50,7 @@ Layer 1 alone stops both attacks. Layer 2 is there in case a future change lets 
 
 ## Run It Yourself
 
-Requires Python 3.9 or later.
+Requires Python 3.12 or later (tested on 3.12 and 3.14).
 
 ```bash
 git clone https://github.com/sherbanokhan/agentguard.git

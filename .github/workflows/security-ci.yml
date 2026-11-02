@@ -1,0 +1,55 @@
+# AgentGuard CI
+#
+# Runs on every push and pull request to main.
+# Checks that my tests still pass and scans the code and packages
+# for security problems, so issues get caught before they're merged.
+
+name: Security CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# The workflow only needs to read the repo, so that's all I'm giving it.
+# Same least privilege idea as the allowlist in my secure agent.
+permissions:
+  contents: read
+
+jobs:
+  test-and-scan:
+    runs-on: ubuntu-latest
+
+    # 3.14 is what I use locally. 3.12 checks that it still works on an
+    # older supported version. I dropped 3.9 because it's end of life
+    # and newer pytest versions don't support it.
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.14"]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit pip-audit
+
+      - name: Run tests
+        run: pytest -v
+
+      # Only scanning app/ because bandit flags every assert in the tests,
+      # and asserts are exactly what tests are supposed to use
+      - name: Scan code with bandit
+        run: bandit -r app
+
+      - name: Check packages for known vulnerabilities
+        run: pip-audit -r requirements.txt
