@@ -2,55 +2,71 @@
 
 **Securing AI agents against prompt injection and tool misuse.**
 
-AgentGuard is a hands-on security lab. I built an intentionally vulnerable AI agent, exploited it with two attacks, then built a secure version with layered defenses and proved the fix with automated tests.
+![Security CI](https://github.com/sherbanokhan/agentguard/actions/workflows/security-ci.yml/badge.svg)
 
-Everything runs as a deterministic simulation. All secrets are fake, and no network calls are made.
+AgentGuard is a hands-on security project about a modern problem: AI agents that don't just answer questions but take actions — reading files, calling tools, posting content. When an agent can't tell the difference between data it reads and instructions from its owner, anyone who can get text in front of it can control what it does.
 
-## Why This Matters
+I built vulnerable agents, attacked them, measured how often the attacks worked, built defenses, and proved the defenses hold. Then I turned the findings into the reports, threat models, and governance documents a security or GRC team would actually use.
 
-AI agents don't just answer questions. They can read files, send messages, and call other tools. If an agent can't tell the difference between instructions from its user and text it's reading, anyone who can get text in front of it can control those tools.
+All work runs locally with fabricated data. No real systems, credentials, or networks are involved.
 
-I started with a simulation instead of a real LLM because a real model can respond differently to the same input. With a simulation, the same input always gives the same output, so I can reproduce the attack, understand the cause, and measure whether my defenses actually work.
+---
 
+## The deliverables
 
-## The Attacks
+These are the write-ups that turn the lab into decision-ready security work:
 
-| Attack | What happens | Mapping |
-|---|---|---|
-| **Indirect prompt injection** | A support article contains hidden instructions. The agent reads a fake API key and sends it to the attacker. | OWASP LLM01, OWASP LLM06 (Excessive Agency), CWE-1427 |
-| **Path traversal** | The article asks for `../lab_private/fake_ssh_key.txt`. The agent's file tool escapes its allowed folder. | CWE-22 |
+| Document | What it is |
+|---|---|
+| [Vulnerability Assessment Report](docs/VULNERABILITY_ASSESSMENT.md) | Formal finding with CVSS score, evidence, and remediation |
+| [Threat Model](docs/THREAT_MODEL.md) | Data-flow diagram, trust boundaries, STRIDE, MITRE ATLAS, risk register |
+| [Governance Playbook](docs/GOVERNANCE_PLAYBOOK.md) | NIST AI RMF / ISO 42001 control mapping, agent-use policy, vendor questionnaire |
 
-![Vulnerable agent: both attacks succeed](docs/images/01-vulnerable-agent-attacks-succeed.png)
+---
 
+## Phase 1 — Foundations (deterministic simulation)
 
-## The Defenses
+A simplified, fully predictable agent that demonstrates the core problem without the noise of a real model. A hidden instruction in a support article makes the agent leak a fake API key and escape its allowed folder (path traversal). I fixed it with three layers of defense and proved each with automated tests.
 
-The secure agent uses three layers, so no single layer has to be perfect:
+- **Attacks:** indirect prompt injection (OWASP LLM01), excessive agency (LLM06), path traversal (CWE-22)
+- **Defenses:** content treated as data only, tools that validate their own inputs, security logging
+- **Result:** 13 automated tests, security scanning (bandit, pip-audit) in CI, all passing on Python 3.12 and 3.14
 
-1. **Content is treated as data only.** The agent's only job is to summarize. Nothing in the article can trigger a tool, no matter how it's worded.
-2. **Tools protect themselves.** The file tool blocks absolute paths and checks where a path really ends up after resolving `../`. The send tool only allows approved destinations (allowlist).
-3. **Detection and logging.** Suspicious phrases and every blocked action are written to a security log.
+Full write-up in [LEARNING_LOG.md](LEARNING_LOG.md).
 
-Layer 1 alone stops both attacks. Layer 2 is there in case a future change lets content reach a tool.
+---
 
-![Secure agent: attacks blocked](docs/images/03-secure-agent-attacks-blocked.png)
+## Phase 2 — A realistic AI agent (local LLM)
 
-![Security log showing blocked events](docs/images/04-security-log-blocked-events.png)
+A triage agent for a fictional company (Novark), powered by a real local model (`qwen2.5:7b` via Ollama). It reads public issues and replies to them, and it holds tools to read repository files and post comments. An attacker who can file a public issue hides an instruction that tells the agent to read the **private** repo and leak its secrets.
 
+### The attack worked
 
-## Results
+I tested the same injection hidden three ways, 15 trials each, and measured how often the agent reached into the private repo:
 
-13 automated tests:
+| Hiding technique | Private access rate |
+|---|---|
+| Visible text | 93% (14/15) |
+| HTML comment | 67% (10/15) |
+| Collapsed `<details>` block | 100% (15/15) |
 
-- **3 tests** confirm the attacks work against the vulnerable agent.
-- **10 tests** confirm the same attacks are blocked by the secure agent, normal requests still work, and blocked actions are logged.
+In separate runs the agent pasted full (fake) production secrets into a public reply.
 
-![All tests passing](docs/images/05-all-tests-pass-before-after.png)
+![Attack succeeds](docs/images/11-attack-succeeds-secret-leaked.png)
 
+### The defense works — and doesn't depend on the model
 
-## Run It Yourself
+The root cause is excessive agency: the agent could read any repo. I scoped its file tool with a **least-privilege allowlist**, and the attack was blocked **100% of the time**, deterministically, because the control lives in the tool, not in the model's judgment.
 
-Requires Python 3.12 or later (tested on 3.12 and 3.14).
+![Defense blocks access](docs/images/13-defense-blocks-access.png)
+
+**The lesson:** prompt injection can't be fully prevented, so the architecture's job is to make a successful injection boring — to ensure that even when the agent is fooled, it can't reach anything that matters.
+
+---
+
+## Run it yourself
+
+Requires Python 3.12+.
 
 ```bash
 git clone https://github.com/sherbanokhan/agentguard.git
@@ -60,44 +76,49 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+**Phase 1:**
 ```bash
 python3 -m app.vulnerable_agent    # attacks succeed
 python3 -m app.secure_agent        # attacks blocked
-pytest -v                          # run all tests
+pytest -v                          # all tests
+```
+
+**Phase 2** (needs [Ollama](https://ollama.com) + a local model):
+```bash
+pip install ollama
+ollama pull qwen2.5:7b
+python3 -m agent_lab.agent         # triage agent + attack
+python3 -m agent_lab.experiment    # success-rate experiment
 ```
 
 ---
 
-## Project Structure
+## Repository structure
 
 ```
 agentguard/
-├── app/
-│   ├── vulnerable_agent.py    # intentionally insecure agent
-│   └── secure_agent.py        # agent with layered defenses
-├── tests/
-│   ├── test_vulnerable_agent.py
-│   └── test_secure_agent.py
-├── docs/images/               # screenshots
-├── logs/                      # created when the secure agent runs (not committed)
-└── LEARNING_LOG.md            # decisions, problems, and lessons
+├── app/                       # Phase 1: simulated vulnerable + secure agents
+├── agent_lab/                 # Phase 2: realistic LLM agent and lab
+│   ├── agent.py               #   the triage agent (LLM + tools)
+│   ├── tools.py               #   agent tools (with the least-privilege fix)
+│   ├── experiment.py          #   success-rate experiment
+│   └── company_data/          #   fabricated public/private repos (fake data)
+├── tests/                     # automated security tests
+├── docs/                      # the three deliverables + images
+├── .github/workflows/         # CI: tests + security scans
+└── LEARNING_LOG.md            # full build log, decisions, and lessons
 ```
 
+---
 
 ## Limitations
 
-- The agent is a simulation. A real LLM reads instructions and data in the same text, so separating them is much harder in practice.
-- The injection detection patterns are simple and easy to reword around. That's why they only log and don't block.
-- The allowlist is hardcoded. In a real system, it would come from a config file or policy service.
+- Phase 1 is a simulation; a real model reads data and instructions in the same text, which is harder to separate.
+- Phase 2 uses one local model; results would differ across models and sizes. I observed that a weaker model (llama3.2 3B) couldn't reliably perform the task at all.
+- Whether the agent completed public disclosure was probabilistic — which is exactly why the defense is least privilege, not reliance on model behavior.
 
+---
 
-## What's Next
+## About
 
-- MCP tool trust analysis
-- AWS IAM least-privilege and CloudTrail-style logging
-- Architecture diagram and threat model
-
-
-## Learning Log
-
-I documented every step, including problems I ran into and how I fixed them, in [LEARNING_LOG.md](LEARNING_LOG.md).
+Built by Sherbano Khan as a hands-on study of AI agent security, from offensive testing through defense to governance. Inspired by real-world indirect-prompt-injection incidents against AI coding and workplace agents.
