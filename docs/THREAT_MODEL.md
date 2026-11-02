@@ -18,7 +18,7 @@ I treat the agent as an autonomous actor with its own permissions, because that 
 
 ## 2. Architecture and Trust Boundaries
 
-![Threat model data flow](docs/images/threat_model.png)
+![Threat model data flow](images/threat_model.png)
 
 The diagram shows four zones and the attack path (in red) I confirmed in testing:
 
