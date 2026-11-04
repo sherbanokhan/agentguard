@@ -1,7 +1,7 @@
 # Threat Model — AI Issue-Triage Agent
 
 **Author:** Sherbano Khan
-**Project:** AgentGuard — Securing AI Agents and MCP Tools
+**Project:** AgentGuard — Securing AI Agents and Their Tools
 **Date:** November 2026
 **Classification:** TLP:CLEAR — may be shared freely (all data in this lab is fabricated)
 **Frameworks used:** STRIDE, MITRE ATLAS, trust-boundary analysis
