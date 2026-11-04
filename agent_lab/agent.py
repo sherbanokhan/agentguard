@@ -1,10 +1,10 @@
 # Novark triage agent
 #
-# Connects a local model (llama3.2 via Ollama) to the tools in tools.py.
-# To keep a small model reliable, Python hands it ONE issue at a time and
-# the model decides how to respond. It still has every tool available,
-# including the one that reaches the private repo. That's the flaw I'll
-# attack before I lock it down.
+# Connects a local model (qwen2.5:7b via Ollama) to the tools in tools.py.
+# To keep the model reliable, Python hands it one issue at a time and the
+# model decides how to respond. It has every tool available, including the
+# one that can reach the private repo. That's the flaw the attack exploits.
+# The fix (the allowlist) lives in tools.py, not here.
 
 import json
 import ollama
