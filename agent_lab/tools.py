@@ -1,8 +1,8 @@
 # Tools for the Novark triage agent.
 #
-# These are the actions the agent can take. Right now they're wide open.
-# The read tool can reach the private repo even though a triage bot shouldn't need it.
-# That's the flaw I'll attack before I fix it.
+# These are the actions the agent can take. In the vulnerable version the
+# read tool can reach the private repo, even though a triage bot never needs
+# it. Setting ENFORCE_ALLOWLIST = True turns on the least-privilege fix.
 
 from pathlib import Path
 
