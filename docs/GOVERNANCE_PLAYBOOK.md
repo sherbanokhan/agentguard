@@ -1,7 +1,7 @@
 # AI Agent Governance Playbook
 
 **Author:** Sherbano Khan
-**Project:** AgentGuard — Securing AI Agents and MCP Tools
+**Project:** AgentGuard — Securing AI Agents and Their Tools
 **Date:** November 2026
 **Classification:** TLP:CLEAR — may be shared freely (all data in this lab is fabricated)
 **Frameworks referenced:** NIST AI RMF, ISO/IEC 42001, OWASP Top 10 for LLM & Agentic Apps
