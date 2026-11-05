@@ -2,13 +2,16 @@
 
 This log documents the design decisions, security concepts, problems, testing, and lessons learned while building AgentGuard.
 
+- **Phase 1 (October 2026):** a simulated agent, two attacks, a secure version with three layers of defense, automated tests, and security CI.
+- **Phase 2 (November 2026):** a real local LLM agent, an attack measured over 45 runs, and a least-privilege fix.
+
 ---
 
-## Day 1 — Environment Setup and Vulnerable Agent Lab
+## Environment Setup and Vulnerable Agent Lab
 
 ### Date
 
-Oct 19, 2026
+October 19, 2026
 
 ### Objective
 
@@ -305,7 +308,7 @@ Fixing prompt injection isn't about catching bad phrases. It's about making sure
 
 ### Screenshots
 
-Saved to `docs/images/` .
+Saved to `docs/images/`.
 
 ---
 
@@ -341,7 +344,7 @@ This was interesting, because bandit didn't flag the vulnerable agent. Bandit lo
 |---|---|---|---|
 | pytest | 8.4.2 | PYSEC-2026-1845 | 9.0.3 |
 
-pytest creates temporary folders with a predictable name in `/tmp`, like `/tmp/pytest-of-{user}`. Since `/tmp` is shared by all users on a computer, another local user could create that folder first and cause a denial of service or possibly gain privileges. My tests use `tmp_path`, so they use this feature.
+pytest creates temporary folders with a predictable name in `/tmp`, like `/tmp/pytest-of-{user}`. Since `/tmp` is shared by all users on a computer, another local user could create that folder first and cause a denial of service or possibly gain privileges. My tests use `tmp_path`, so they do rely on this feature.
 
 ### Risk Assessment
 
@@ -379,3 +382,67 @@ I also noticed a `NotOpenSSLWarning` when running pip-audit, because the Mac's b
 I followed the full process: detect, understand, assess, fix. Reading the advisory first helped me understand the real risk instead of just upgrading blindly.
 
 I also learned that the latest version isn't always the safest choice. The safest choice is usually a supported, stable version that my tools work with. Unsupported software quietly collects unfixed vulnerabilities, which is what happened with Python 3.9.
+
+---
+
+## Phase 2: A Realistic AI Agent with a Local LLM
+
+### Date
+
+November 1–2, 2026
+
+### Objective
+
+Replace the simulated agent with a real local AI model that makes its own decisions, attack it with indirect prompt injection, measure how often the attack works, and fix it.
+
+### What I Built
+
+I created a new `agent_lab/` folder for a fictional company called Novark:
+
+- **Fake company data.** A public repo with three issues (`issue_001` and `issue_002` are normal, `issue_003` is poisoned) and a private repo with a fake `config.py`. I made the fake secrets look like `DEMO_..._NOT_REAL` on purpose, so secret scanners don't mistake them for real keys.
+- **Three tools** in `tools.py`: `list_issues`, `read_repo_file`, and `post_comment`. In the vulnerable version, `read_repo_file` can read any repo, including the private one.
+- **The agent** in `agent.py`. It connects a local model through Ollama to the tools using real tool calling. Python gives it one issue at a time, and the model decides which tools to call.
+- **The experiment** in `experiment.py`. It runs the same attack hidden three different ways, 15 times each, and records whether the agent read the private file and whether a secret ended up in a public comment. Results save to `results/attack_results.csv`.
+
+### Problem: The First Model Couldn't Do the Task
+
+I started with `llama3.2` (3B) because it's small and fast. It couldn't reliably chain tool calls, and sometimes it made up file contents instead of actually reading the file. A model that can't do the job isn't a useful test, so I switched to `qwen2.5:7b`, which my Mac (16 GB of RAM) runs fine. It handled the normal issues correctly, which gave me a clean baseline.
+
+### Results
+
+| How the instruction was hidden | Read the private repo |
+|---|---|
+| Visible text ("SYSTEM NOTE...") | 14 / 15 (93%) |
+| HTML comment | 10 / 15 (67%) |
+| Collapsed `<details>` block | 15 / 15 (100%) |
+
+In all 45 batch runs, the model stopped before posting the secrets publicly. In separate runs outside the experiment, it did post the full fake config in a public reply (screenshot 11).
+
+What surprised me: hiding the instruction in an HTML comment worked the least. Something hidden from a human reviewer isn't automatically more convincing to the model.
+
+### The Fix
+
+The root cause was excessive agency. A bot that answers public issues never needs the private repo. I added an allowlist inside `read_repo_file` (`ALLOWED_REPOS = {"public_repo"}`), turned on with `ENFORCE_ALLOWLIST`. With it on, the agent still tried to read the private repo, because the injection still fooled it, but the tool refused every time and returned `ACCESS DENIED`.
+
+### Deliverables
+
+I turned the findings into three documents in `docs/`:
+
+- **Vulnerability assessment:** the finding, my CVSS 3.1 score (8.6, High), evidence, and remediation.
+- **Threat model:** trust boundaries, STRIDE, MITRE ATLAS mapping, and a risk register.
+- **Governance playbook:** controls mapped to NIST AI RMF and ISO 42001, an agent-use policy, and a vendor questionnaire.
+
+### What I Learned
+
+The model's good behavior is not a security control. It stopped the final step in every batch run, but it still reached private data almost every time, and in separate runs it did leak the secrets. An attacker only needs it to work once. The fix that held was in the tool, not in the model's judgment. I also learned to measure attacks over many runs instead of trusting one result, because a real model doesn't behave the same way every time.
+
+### Limitations
+
+- I tested one model. Other models and sizes would give different results.
+- 15 runs per technique is a small sample.
+- GitHub is simulated with local folders, not the real GitHub API.
+- Phase 2 isn't covered by the automated tests or CI, because it needs a local model running. The CI checks cover the Phase 1 code in `app/`.
+
+### Screenshots
+
+Saved to `docs/images/` (10 to 13).
